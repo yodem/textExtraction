@@ -36,8 +36,6 @@ ENV/
 # Project specific
 column_visualization*/
 hebrew_texts/
-pdf_files/
-*.pdf
 *.txt
 
 # OS specific
