@@ -3,11 +3,11 @@ import re
 import os
 from pathlib import Path
 from pdf2image import convert_from_path
-from PIL import Image, ImageDraw
 import cv2
 import numpy as np
 
-def visualize_columns(pdf_path, output_dir='column_visualization2'):
+
+def visualize_columns(pdf_path, output_dir='column_visualization4'):
     """
     Draw rectangles around the detected columns using image processing
     """
@@ -26,7 +26,7 @@ def visualize_columns(pdf_path, output_dir='column_visualization2'):
             _, binary = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
             
             # Create kernels for vertical and horizontal connections
-            vertical_kernel = np.ones((30,1), np.uint8)  # Increased from 25 to 50
+            vertical_kernel = np.ones((40,1), np.uint8)
             horizontal_kernel = np.ones((1,20), np.uint8)
             
             # Connect text vertically first
@@ -86,37 +86,42 @@ def visualize_columns(pdf_path, output_dir='column_visualization2'):
         print(f"Error visualizing columns: {str(e)}")
         raise e
 
+def clean_hebrew_text(text):
+    """Clean Hebrew text before processing"""
+    # Remove any non-Hebrew characters except common punctuation
+    text = re.sub(r'[^\u0590-\u05FF\.,!?"\s]', '', text)
+    # Normalize spaces
+    text = re.sub(r'\s+', ' ', text)
+    # Remove any RTL/LTR marks
+    text = re.sub(r'[\u200e\u200f\u202a-\u202e]', '', text)
+    return text.strip()
+
 def process_text_blocks(pdf_path, blocks, page, cv_img):
     """
     Process text blocks from a page and extract text in correct order
     """
-    # Get page dimensions for scaling
+    page_text = []
     width = page.width
     height = page.height
-    
-    # Calculate scaling factors
     scale_x = width / cv_img.shape[1]
     scale_y = height / cv_img.shape[0]
     
-    # Convert block coordinates to PDF coordinates and extract text
-    page_text = []
-    
     for i, block in enumerate(blocks):
-        # Convert coordinates from image space to PDF space
         pdf_bbox = (
-            block[0] * scale_x,  # x0
-            block[1] * scale_y,  # y0
-            block[2] * scale_x,  # x1
-            block[3] * scale_y   # y1
+            block[0] * scale_x,
+            block[1] * scale_y,
+            block[2] * scale_x,
+            block[3] * scale_y
         )
         
         try:
-            # Crop and extract text from the block
             crop = page.crop(bbox=pdf_bbox)
             if crop:
                 text = crop.extract_text()
                 if text:
                     text = clean_rashi_text(text)
+                    # text = clean_hebrew_text(text)
+                    print(text)
                     column_type = "Right Column" if i == 0 else "Left Column"
                     page_text.append(f"{'='*20}\n{column_type}\n{'='*20}")
                     page_text.append(text)
@@ -127,7 +132,7 @@ def process_text_blocks(pdf_path, blocks, page, cv_img):
 
 def extract_rashi_text(pdf_path):
     """
-    Extract Hebrew text from a two-column PDF file using image processing
+    Extract Hebrew text from a PDF file - process text blocks if found, otherwise extract full page
     """
     extracted_text = []
     
@@ -150,7 +155,7 @@ def extract_rashi_text(pdf_path):
                 _, binary = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
                 
                 # Create kernels for vertical and horizontal connections
-                vertical_kernel = np.ones((30,1), np.uint8)
+                vertical_kernel = np.ones((40,1), np.uint8)
                 horizontal_kernel = np.ones((1,20), np.uint8)
                 
                 # Connect text vertically first
@@ -179,8 +184,8 @@ def extract_rashi_text(pdf_path):
                         aspect_ratio > 1.0):
                         text_blocks.append((x, y, x+w, y+h))
                 
-                # Process text blocks if exactly 2 found, otherwise extract full page
-                if len(text_blocks) == 2:
+                # Process text blocks if any found, otherwise extract full page
+                if text_blocks:
                     # Sort blocks right to left
                     text_blocks.sort(key=lambda x: x[0], reverse=True)
                     page_text = process_text_blocks(pdf_path, text_blocks, page, cv_img)
@@ -190,14 +195,16 @@ def extract_rashi_text(pdf_path):
                         text = page.extract_text()
                         if text:
                             text = clean_rashi_text(text)
+                            print(text)
                             extracted_text.append(f"{'='*20}\nFull Page Text\n{'='*20}")
                             extracted_text.append(text)
                 else:
-                    # Extract entire page if not exactly 2 blocks
-                    print(f"Found {len(text_blocks)} blocks on page {page_num}, extracting full page")
+                    # Extract entire page if no blocks found
+                    print(f"No text blocks found on page {page_num}, extracting full page")
                     text = page.extract_text()
                     if text:
                         text = clean_rashi_text(text)
+                        print(text)
                         extracted_text.append(f"{'='*20}\nFull Page Text\n{'='*20}")
                         extracted_text.append(text)
                 
@@ -226,7 +233,7 @@ def save_to_file(text_list, output_path):
                     lines = text.split('\n')
                     for line in lines:
                         if line.strip():  # Only process non-empty lines
-                            f.write('\u200F' + line.strip()[::-1] + '\n')
+                            f.write(line.strip()[::-1] + '\n')
                     f.write('\n')  # Add extra newline between blocks
     except Exception as e:
         print(f"Error saving file: {str(e)}")
@@ -286,7 +293,6 @@ def process_directory(input_dir='.', output_dir='extracted_texts'):
             print(f"No text was extracted from: {pdf_file}")
 
 def main():
-    # First visualize the columns
     input_dir = "./pdf_files"
     pdf_files = [f for f in os.listdir(input_dir) if f.lower().endswith('.pdf')]
     
@@ -297,15 +303,8 @@ def main():
         # Visualize columns first
         visualize_columns(pdf_path)
         
-        # Ask user if the column detection looks correct
-        response = input("Check the column visualization in 'column_visualization2' folder. Continue with extraction? (y/n): ")
-        
-        if response.lower() == 'y':
-            # Process the PDF
-            output_dir = "./hebrew_texts"
-            process_directory(input_dir, output_dir)
-        else:
-            print("Skipping extraction. Please adjust the column parameters and try again.")
+        output_dir = "./extractedText"
+        process_directory(input_dir, output_dir)
 
 if __name__ == "__main__":
-    main() 
+    main()
