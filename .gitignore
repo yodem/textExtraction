@@ -37,6 +37,7 @@ ENV/
 column_visualization*/
 hebrew_texts/
 *.txt
+!requirements.txt
 
 # OS specific
 .DS_Store
