@@ -294,17 +294,20 @@ def process_directory(input_dir='.', output_dir='extracted_texts'):
 
 def main():
     input_dir = "./pdf_files"
-    pdf_files = [f for f in os.listdir(input_dir) if f.lower().endswith('.pdf')]
+    output_dir = "./extractedText"
     
-    for pdf_file in pdf_files:
-        print(f"\nProcessing: {pdf_file}")
-        pdf_path = os.path.join(input_dir, pdf_file)
-        
-        # Visualize columns first
-        visualize_columns(pdf_path)
-        
-        output_dir = "./extractedText"
-        process_directory(input_dir, output_dir)
+    # Process all PDFs once
+    print("Starting PDF processing...")
+    process_directory(input_dir, output_dir)
+    
+    # # Visualization code commented out
+    # pdf_files = [f for f in os.listdir(input_dir) if f.lower().endswith('.pdf')]
+    # for pdf_file in pdf_files:
+    #     print(f"\nVisualizing columns for: {pdf_file}")
+    #     pdf_path = os.path.join(input_dir, pdf_file)
+    #     visualize_columns(pdf_path)
+    
+    print("Processing complete!")
 
 if __name__ == "__main__":
     main()
